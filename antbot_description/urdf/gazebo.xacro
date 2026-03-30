@@ -1,0 +1,163 @@
+<?xml version="1.0" ?>
+<!--
+  Gazebo (Ignition Fortress) simulation plugins for ANTBot.
+  Adds physics properties, sensor plugins, and ign_ros2_control.
+-->
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <!-- Gazebo physics for base_link -->
+  <gazebo reference="base_link">
+    <mu1>0.2</mu1>
+    <mu2>0.2</mu2>
+  </gazebo>
+
+  <!-- Wheel surface friction for all four wheels -->
+  <xacro:macro name="WheelGazebo" params="position_name">
+    <gazebo reference="${position_name}_wheel_link">
+      <mu1>1.5</mu1>
+      <mu2>1.5</mu2>
+      <kp>1e6</kp>
+      <kd>1e2</kd>
+      <min_depth>0.001</min_depth>
+    </gazebo>
+    <gazebo reference="${position_name}_steering_link">
+      <mu1>0.0</mu1>
+      <mu2>0.0</mu2>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:WheelGazebo position_name="front_left"/>
+  <xacro:WheelGazebo position_name="front_right"/>
+  <xacro:WheelGazebo position_name="rear_left"/>
+  <xacro:WheelGazebo position_name="rear_right"/>
+
+  <!-- ign_ros2_control plugin (loads ros2_control in Ignition) -->
+  <gazebo>
+    <plugin filename="libign_ros2_control-system.so"
+            name="ign_ros2_control::IgnitionROS2ControlPlugin">
+      <parameters>$(find antbot_bringup)/config/swerve_drive_controller_sim.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+  <!-- Front 2D LiDAR (scan_0) -->
+  <gazebo reference="lidar_2d_front_link">
+    <sensor name="lidar_2d_front" type="gpu_lidar">
+      <always_on>true</always_on>
+      <update_rate>10</update_rate>
+      <topic>scan_0</topic>
+      <ignition_frame_id>lidar_2d_front_link</ignition_frame_id>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.70</min>
+          <max>20.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </lidar>
+      <visualize>true</visualize>
+    </sensor>
+  </gazebo>
+
+  <!-- Back 2D LiDAR (scan_1) -->
+  <gazebo reference="lidar_2d_back_link">
+    <sensor name="lidar_2d_back" type="gpu_lidar">
+      <always_on>true</always_on>
+      <update_rate>10</update_rate>
+      <topic>scan_1</topic>
+      <ignition_frame_id>lidar_2d_back_link</ignition_frame_id>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.70</min>
+          <max>20.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </lidar>
+      <visualize>false</visualize>
+    </sensor>
+  </gazebo>
+
+  <!-- 3D LiDAR (Vanjee WLR-722 approximation: 16ch, 360 deg H, 30 deg V) -->
+  <gazebo reference="lidar_3d_link">
+    <sensor name="lidar_3d" type="gpu_lidar">
+      <always_on>true</always_on>
+      <update_rate>10</update_rate>
+      <topic>lidar_3d_points</topic>
+      <ignition_frame_id>lidar_3d_link</ignition_frame_id>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>720</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>16</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.2618</min_angle>
+            <max_angle>0.2618</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.05</min>
+          <max>70.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </lidar>
+      <visualize>false</visualize>
+    </sensor>
+  </gazebo>
+
+  <!-- IMU sensor -->
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <always_on>true</always_on>
+      <update_rate>200</update_rate>
+      <topic>imu</topic>
+      <ignition_frame_id>imu_link</ignition_frame_id>
+      <imu>
+        <angular_velocity>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise></z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x><noise type="gaussian"><mean>0.0</mean><stddev>0.017</stddev></noise></x>
+          <y><noise type="gaussian"><mean>0.0</mean><stddev>0.017</stddev></noise></y>
+          <z><noise type="gaussian"><mean>0.0</mean><stddev>0.017</stddev></noise></z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+
+</robot>

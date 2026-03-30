@@ -236,7 +236,10 @@ const
   if (use_steering_acceleration_command_) {
     ++steering_interface_count;
   }
-  size_t wheel_interface_count = 2;  // velocity + acceleration (always claimed)
+  size_t wheel_interface_count = 1;  // velocity is always required
+  if (use_wheel_acceleration_command_) {
+    ++wheel_interface_count;  // acceleration is optional
+  }
   conf.names.reserve(
     steering_names.size() * steering_interface_count +
     wheel_names.size() * wheel_interface_count);
@@ -251,7 +254,9 @@ const
   }
   for (const auto & joint_name : wheel_names) {
     conf.names.push_back(joint_name + "/" + HW_IF_VELOCITY);
-    conf.names.push_back(joint_name + "/" + hardware_interface::HW_IF_ACCELERATION);
+    if (use_wheel_acceleration_command_) {
+      conf.names.push_back(joint_name + "/" + hardware_interface::HW_IF_ACCELERATION);
+    }
   }
   return conf;
 }
