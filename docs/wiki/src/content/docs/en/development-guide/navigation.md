@@ -1,17 +1,58 @@
 ---
 title: 5.3 Nav2 Integration
-description: AntBot Nav2 Navigation Guide
+description: AntBot Nav2 Navigation Stack Integration Guide
 sidebar:
   order: 3
 ---
 
-The `antbot_navigation` package provides [Nav2](https://docs.nav2.org/) navigation stack integration for the AntBot swerve-drive robot.
+AntBot uses Nav2, the official ROS 2 navigation framework, for autonomous driving.
+Custom tuning is applied for the 4-wheel independent swerve-drive characteristics.
+
+---
 
 ## Overview
 
-Nav2 is the official ROS 2 navigation framework for autonomous robot movement with obstacle avoidance. AntBot uses MPPI controller, OmniMotionModel AMCL, and EKF sensor fusion, tuned for holonomic swerve-drive characteristics.
+### Nav2 Pipeline
 
-## Prerequisites
+```
+User sets goal
+       │
+       ▼
+┌─ BT Navigator ─────────────────────────────────┐
+│  Behavior tree orchestration                     │
+│                                                  │
+│  ┌──────────────┐    ┌───────────────────┐      │
+│  │ Planner      │    │ Controller        │      │
+│  │ Server       │───▶│ Server            │      │
+│  │ NavFn(A*)    │    │ MPPI Omni         │      │
+│  └──────┬───────┘    └────────┬──────────┘      │
+│  ┌──────▼───────┐    ┌───────▼──────────┐       │
+│  │ Global       │    │ Local            │       │
+│  │ Costmap      │    │ Costmap          │       │
+│  └──────────────┘    └──────────────────┘       │
+│  ┌──────────────┐                               │
+│  │ Behavior     │  spin, backup, wait           │
+│  │ Server       │                               │
+│  └──────────────┘                               │
+└──────────────────────────────────────────────────┘
+```
+
+### AntBot vs Standard diff-drive
+
+| Aspect | Standard diff-drive | AntBot swerve |
+|--------|---------------------|---------------|
+| Controller | DWB | **MPPI** (rollout-based optimization) |
+| Motion Model (AMCL) | DifferentialMotionModel | **OmniMotionModel** |
+| Velocity DOF | vx, wz (2DOF) | **vx, vy, wz (3DOF)** |
+| Costmap Inflation | ~0.3m | **0.75m** (steering overshoot margin) |
+| LiDAR | Single | **Dual 2D** (front + back) |
+| Odometry TF | Direct publish | **EKF sensor fusion** (collision protection) |
+
+---
+
+## Quick Start
+
+### Prerequisites
 
 ```bash
 sudo apt install ros-humble-navigation2 ros-humble-nav2-bringup \
@@ -19,55 +60,64 @@ sudo apt install ros-humble-navigation2 ros-humble-nav2-bringup \
   ros-humble-nav2-mppi-controller
 ```
 
-## Build
+### Run (3 Terminals)
+
+**Terminal 1 — Gazebo Simulation**
 
 ```bash
-cd ~/ros2_ws
-colcon build --symlink-install --packages-select antbot_navigation
-source install/setup.bash
+ros2 launch antbot_gazebo gazebo.launch.py
 ```
 
-## Navigation Modes
+:::note
+Wait ~8-15 seconds for the Gazebo window and controller spawners to complete.
+:::
 
-### SLAM (Map Building + Navigation)
-
-Start without a map and build one while exploring the environment.
-
-```bash
-# On Gazebo simulation
-ros2 launch antbot_navigation slam.launch.py mode:=sim
-
-# On real robot
-ros2 launch antbot_navigation slam.launch.py mode:=real
-```
-
-Save the map:
-
-```bash
-ros2 run nav2_map_server map_saver_cli -f ~/maps/my_map
-```
-
-### Navigation (Saved Map + Autonomous Driving)
-
-Full autonomous navigation with a saved map and AMCL localization.
+**Terminal 2 — Nav2 Navigation**
 
 ```bash
 ros2 launch antbot_navigation navigation.launch.py mode:=sim \
-  map:=/path/to/map.yaml
+  map:=$(ros2 pkg prefix antbot_navigation)/share/antbot_navigation/maps/depot_sim.yaml
 ```
 
-### Localization Only (No Planning)
-
-Test localization before enabling autonomous navigation.
+**Terminal 3 — RViz**
 
 ```bash
-ros2 launch antbot_navigation localization.launch.py mode:=sim \
-  map:=/path/to/map.yaml
+rviz2 -d $(ros2 pkg prefix antbot_navigation)/share/antbot_navigation/rviz/navigation.rviz
 ```
+
+### Controlling the Robot
+
+**Single goal**: In RViz, click **2D Pose Estimate** to set initial pose → click **Nav2 Goal**
+
+**Waypoint following**: RViz → Panels → Add New Panel → `nav2_rviz_plugins/Navigation2` → check Waypoint Mode → click multiple goals → Start Waypoint Following
+
+**CLI**:
+
+```bash
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  "{pose: {header: {frame_id: 'map'}, pose: {position: {x: 5.0, y: 3.0}}}}"
+```
+
+### Navigation Modes
+
+| Launch file | Purpose | Features |
+|-------------|---------|----------|
+| `navigation.launch.py` | Autonomous driving with saved map | AMCL + full Nav2 stack |
+| `slam.launch.py` | Build map while navigating | SLAM Toolbox (no map needed) |
+| `localization.launch.py` | Localization only | No planning, position estimation only |
+
+Save map: `ros2 run nav2_map_server map_saver_cli -f ~/maps/my_map`
+
+---
 
 ## Sim / Real Mode
 
 All launch files accept a `mode` argument that auto-selects the config directory and `use_sim_time`:
+
+```bash
+ros2 launch antbot_navigation slam.launch.py mode:=sim    # simulation
+ros2 launch antbot_navigation slam.launch.py mode:=real   # real robot
+```
 
 | Setting | `mode:=sim` | `mode:=real` |
 |---------|-------------|--------------|
@@ -78,117 +128,135 @@ All launch files accept a `mode` argument that auto-selects the config directory
 | EKF process noise | Low (ideal sensors) | Higher (real noise) |
 | MPPI `batch_size` | 2000 | 1500 (Jetson Orin) |
 
-## Quick Start (Simulation)
+---
 
-For simulation environment setup, see [5.4 Simulation Environment Setup](/antbot/en/development-guide/simulation/).
-
-**Terminal 1** — Gazebo:
-
-```bash
-ros2 launch antbot_gazebo gazebo.launch.py
-```
-
-**Terminal 2** — SLAM navigation:
-
-```bash
-ros2 launch antbot_navigation slam.launch.py mode:=sim
-```
-
-**Terminal 3** — RViz:
-
-```bash
-rviz2 -d $(ros2 pkg prefix antbot_navigation)/share/antbot_navigation/rviz/navigation.rviz
-```
-
-In RViz:
-1. Click **2D Pose Estimate** to set initial position
-2. Click **Nav2 Goal** to send a destination
-
-## Architecture
-
-```
-         /cmd_vel (Twist)
-              ▲
-              │
-┌─────────────┴──────────────────────────┐
-│  Nav2 Stack                            │
-│  BT Navigator → Planner → Controller  │
-│  (A* path)      (MPPI Omni)           │
-│        ↕            ↕                  │
-│  Global Costmap  Local Costmap         │
-│  (static+obs)    (obs+inflation)       │
-│        ↕                               │
-│  AMCL / SLAM Toolbox                   │
-│  (map → odom TF)                       │
-└────────────────────────────────────────┘
-              │
-              ▼
-┌────────────────────────────────────────┐
-│  EKF (robot_localization)              │
-│  Input: /odom (vx,vy) + IMU (vyaw)    │
-│  Output: odom → base_link TF (50Hz)   │
-└────────────────────────────────────────┘
-              │
-              ▼
-   Swerve Controller (IK → motor commands)
-```
+## System Architecture
 
 ### TF Tree
 
 ```
-map → odom → base_link → [sensor frames]
- ^       ^
- │       │
-AMCL    EKF (wheel odom + IMU fusion)
+       map
+        │  ← AMCL (particle filter localization)
+       odom
+        │  ← EKF (wheel odom + IMU fusion)
+     base_link
+        ├── lidar_2d_front_link, lidar_2d_back_link
+        ├── imu_link
+        └── steering/wheel links
 ```
 
-Navigation launch files disable the swerve controller's `odom→base_link` TF and let the EKF publish it instead via sensor fusion.
+| Transform | Publisher |
+|-----------|----------|
+| `map → odom` | AMCL or SLAM Toolbox |
+| `odom → base_link` | EKF (Nav2 mode) or swerve controller (standalone) |
+| `base_link → *` | robot_state_publisher |
 
-## Swerve-Drive Specific Configuration
+### odom TF Handover
+
+:::caution
+If both swerve controller and EKF publish `odom→base_link` TF simultaneously, jitter occurs.
+Navigation launch auto-disables the controller's TF after 3 seconds, but timing may fail.
+If you see jitter, disable manually:
+
+```bash
+ros2 param set /antbot_swerve_controller enable_odom_tf false
+```
+:::
+
+---
+
+## Configuration
+
+Config files: `antbot_navigation/config/{sim,real}/`
 
 ### MPPI Controller
 
-MPPI is chosen over DWB because its rollout-based optimization handles steering re-alignment delays and discontinuous mode transitions better.
+```yaml
+FollowPath:
+  plugin: "nav2_mppi_controller::MPPIController"
+  motion_model: "Omni"
+  time_steps: 56           # 2.8s lookahead
+  batch_size: 2000
+  vx_max: 5.0              # sim (real: 2.0)
+  vy_max: 1.0              # limit lateral motion (sim, real: 0.5)
+```
 
-| Parameter | Value | Purpose |
-|-----------|-------|---------|
-| `motion_model` | `Omni` | Holonomic 3-DOF (vx, vy, wz) |
-| `vy_max` | 1.0 (sim) / 0.5 (real) | Limit lateral motion (prevent crab-walking) |
-| `PreferForwardCritic` | weight 5.0 | Prefer forward-facing travel |
-| `TwirlingCritic` | weight 5.0 | Suppress unnecessary spinning |
+#### MPPI Critics
 
-### EKF Sensor Fusion
-
-| Source | Fused States |
-|--------|-------------|
-| Wheel odom (`/odom`) | vx, vy, vyaw |
-| IMU | yaw, vyaw (differential mode) |
-
-### Dual LiDAR Costmap
-
-- Front LiDAR (`/scan_0`): AMCL/SLAM input + costmap
-- Back LiDAR (`/scan_1`): costmap only (reverse safety)
+| Critic | Weight | Purpose |
+|--------|--------|---------|
+| ConstraintCritic | 4.0 | Velocity constraint violation penalty |
+| GoalCritic | 5.0 | Goal approach reward |
+| **PreferForwardCritic** | **5.0** | **Forward-facing travel (swerve key)** |
+| **PathAngleCritic** | **5.0** | **Body angle = path direction (swerve key)** |
+| **TwirlingCritic** | **5.0** | **Suppress unnecessary spinning (swerve key)** |
+| ObstaclesCritic | — | Collision avoidance |
+| PathAlignCritic | 10.0 | Trajectory-path alignment |
+| PathFollowCritic | 5.0 | Global path following |
 
 ### AMCL
 
-Uses `OmniMotionModel` — essential for swerve robots to model lateral motion in localization. The default `DifferentialMotionModel` significantly degrades accuracy.
+```yaml
+amcl:
+  robot_model_type: "nav2_amcl::OmniMotionModel"  # required for holonomic
+  scan_topic: /scan_0
+```
 
-## Sensor Topics
+:::caution
+`OmniMotionModel` is **required** for swerve robots. The default `DifferentialMotionModel` cannot model lateral motion (vy), significantly degrading localization accuracy.
+:::
 
-| Topic | Type | Source |
-|-------|------|--------|
-| `/scan_0` | `LaserScan` | Front 2D LiDAR |
-| `/scan_1` | `LaserScan` | Back 2D LiDAR |
-| `/odom` | `Odometry` | Swerve controller |
-| `/imu_node/imu/accel_gyro` | `Imu` | IMU sensor |
+### EKF Sensor Fusion
 
-Topic names are identical between simulation (ros_gz_bridge) and real robot (hardware drivers).
+```yaml
+odom0: /odom                    # vx, vy, vyaw
+imu0: /imu_node/imu/accel_gyro  # yaw, vyaw (differential mode)
+odom0_rejection_threshold: 2.0  # reject collision spikes
+```
+
+### Costmap
+
+Robot footprint 0.70m × 0.60m, dual LiDAR (`/scan_0` front + `/scan_1` back).
+
+| Aspect | Local Costmap | Global Costmap |
+|--------|---------------|----------------|
+| Frame | `odom` | `map` |
+| Size | 5m × 5m rolling | Full map |
+| Update | 5Hz | 1Hz |
+| Layers | obstacle×2 + inflation | static + obstacle×2 + inflation |
+
+---
 
 ## Troubleshooting
 
-- **"Failed to create plan"** — Wrong initial pose. Use **2D Pose Estimate** in RViz.
-- **Wall collision** — Increase `inflation_radius` or `collision_margin_distance`.
-- **Odom drift after collision** — EKF `odom0_rejection_threshold` filters spikes. Re-localize if persistent.
-- **TF jitter** — Navigation launch auto-disables swerve controller TF (EKF takes over).
+### "Failed to create plan"
 
-For `/cmd_vel` and `/odom` topic specifications, see [Key ROS Topics/Services](/antbot/en/development-guide/ros-topics/).
+Robot is inside an obstacle on the costmap. Use **2D Pose Estimate** in RViz, or:
+
+```bash
+ros2 service call /global_costmap/clear_entirely_global_costmap nav2_msgs/srv/ClearEntireCostmap
+```
+
+### Wall collision
+
+1. Increase `inflation_radius` (0.75 → 1.0)
+2. Decrease `cost_scaling_factor` (1.5 → 1.0)
+3. Increase `ObstaclesCritic.collision_margin_distance`
+
+### Crab-walking
+
+Reduce `vy_max` or increase `PreferForwardCritic` weight.
+
+### Diagnostic Commands
+
+```bash
+ros2 topic hz /scan_0
+ros2 run tf2_ros tf2_echo map odom
+ros2 param get /antbot_swerve_controller enable_odom_tf
+ros2 lifecycle get /controller_server
+```
+
+:::tip
+For `/cmd_vel` and `/odom` topic specifications, see [5.2 Key ROS Topics/Services](/antbot/en/development-guide/ros-topics/).
+For simulation environment details, see [5.4 Simulation Environment Setup](/antbot/en/development-guide/simulation/).
+:::
