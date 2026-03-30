@@ -99,6 +99,8 @@
           <stddev>0.008</stddev>
         </noise>
       </lidar>
+      <!-- Disabled to reduce Gazebo rendering load (720 rays per frame).
+           Enable temporarily for debugging: set to true. -->
       <visualize>false</visualize>
     </sensor>
   </gazebo>
