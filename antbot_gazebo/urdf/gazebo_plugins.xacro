@@ -2,18 +2,18 @@
 <!-- Copyright 2026 ROBOTIS AI CO., LTD.
      Licensed under the Apache License, Version 2.0 -->
 <!--
-  Gazebo 물리/센서 플러그인 정의.
-  마찰, ros2_control 연결, LiDAR 2개, IMU를 설정합니다.
+  Gazebo physics/sensor plugin definitions.
+  Configures friction, ros2_control, 2x LiDAR, and IMU.
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- ── 바닥 마찰 ── -->
+  <!-- ── Ground friction ── -->
   <gazebo reference="base_link">
     <mu1>0.2</mu1>
     <mu2>0.2</mu2>
   </gazebo>
 
-  <!-- ── 휠 마찰 매크로 ── -->
+  <!-- ── Wheel friction macro ── -->
   <xacro:macro name="WheelFriction" params="prefix">
     <gazebo reference="${prefix}_wheel_link">
       <mu1>1.8</mu1>
@@ -33,7 +33,7 @@
   <xacro:WheelFriction prefix="rear_left"/>
   <xacro:WheelFriction prefix="rear_right"/>
 
-  <!-- ── ign_ros2_control 플러그인 ── -->
+  <!-- ── ign_ros2_control plugin ── -->
   <gazebo>
     <plugin filename="libign_ros2_control-system.so"
             name="ign_ros2_control::IgnitionROS2ControlPlugin">
@@ -41,7 +41,7 @@
     </plugin>
   </gazebo>
 
-  <!-- ── 전방 2D LiDAR (gpu_lidar) ── -->
+  <!-- ── Front 2D LiDAR (gpu_lidar) ── -->
   <gazebo reference="lidar_2d_front_link">
     <sensor name="lidar_2d_front" type="gpu_lidar">
       <always_on>true</always_on>
@@ -72,7 +72,7 @@
     </sensor>
   </gazebo>
 
-  <!-- ── 후방 2D LiDAR (gpu_lidar) ── -->
+  <!-- ── Back 2D LiDAR (gpu_lidar) ── -->
   <gazebo reference="lidar_2d_back_link">
     <sensor name="lidar_2d_back" type="gpu_lidar">
       <always_on>true</always_on>
@@ -103,7 +103,7 @@
     </sensor>
   </gazebo>
 
-  <!-- ── IMU 센서 ── -->
+  <!-- ── IMU sensor ── -->
   <gazebo reference="imu_link">
     <sensor name="imu_sensor" type="imu">
       <always_on>true</always_on>

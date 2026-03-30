@@ -2,9 +2,9 @@
 <!-- Copyright 2026 ROBOTIS AI CO., LTD.
      Licensed under the Apache License, Version 2.0 -->
 <!--
-  Gazebo 시뮬레이션용 ros2_control 하드웨어 인터페이스.
-  실물의 BoardInterface 대신 IgnitionSystem을 사용합니다.
-  IgnitionSystem은 acceleration/effort 인터페이스를 지원하지 않으므로 제외합니다.
+  Gazebo simulation ros2_control hardware interface.
+  Uses IgnitionSystem instead of the real BoardInterface.
+  Excludes acceleration/effort interfaces (unsupported by IgnitionSystem).
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
@@ -14,7 +14,7 @@
         <plugin>ign_ros2_control/IgnitionSystem</plugin>
       </hardware>
 
-      <!-- 휠 조인트: 속도 명령 / 위치·속도 상태 -->
+      <!-- Wheel joints: velocity command / position+velocity state -->
       <joint name="wheel_front_left_joint">
         <command_interface name="velocity"/>
         <state_interface name="velocity"/>
@@ -36,7 +36,7 @@
         <state_interface name="position"/>
       </joint>
 
-      <!-- 스티어링 조인트: 위치 명령 / 위치·속도 상태 -->
+      <!-- Steering joints: position command / position+velocity state -->
       <joint name="steering_front_left_joint">
         <command_interface name="position"/>
         <state_interface name="position"/>

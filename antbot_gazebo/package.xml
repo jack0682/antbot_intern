@@ -5,7 +5,7 @@
 <package format="3">
   <name>antbot_gazebo</name>
   <version>0.1.0</version>
-  <description>Ignition Gazebo 시뮬레이션 패키지 for ANTBot</description>
+  <description>Ignition Gazebo simulation package for ANTBot</description>
   <maintainer email="osh@robotis.com">SungHyeon Oh</maintainer>
   <license>Apache-2.0</license>
 

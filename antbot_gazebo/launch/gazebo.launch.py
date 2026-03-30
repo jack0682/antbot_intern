@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# ANTBot Ignition Gazebo 시뮬레이션 런치 파일.
+# ANTBot Ignition Gazebo simulation launch file.
 #
-# 사용법:
+# Usage:
 #   ros2 launch antbot_gazebo gazebo.launch.py
 #   ros2 launch antbot_gazebo gazebo.launch.py world:=/path/to/world.sdf
 # 
@@ -36,7 +36,7 @@ import xacro
 
 
 def _spawn_controllers(context, *args, **kwargs):
-    """Gazebo 기동 후 컨트롤러를 순차적으로 스폰합니다."""
+    """Wait for Gazebo startup before spawning controllers."""
     import time
     delay = float(LaunchConfiguration('controller_delay').perform(context))
     time.sleep(delay)
@@ -47,25 +47,25 @@ def generate_launch_description():
     gazebo_pkg = get_package_share_directory('antbot_gazebo')
     description_pkg = get_package_share_directory('antbot_description')
 
-    # 기본 world 파일
+    # Default world file
     default_world = os.path.join(gazebo_pkg, 'worlds', 'empty.sdf')
 
-    # ROS distro에 따른 플러그인 경로
+    # Plugin path based on ROS distro
     ros_distro = os.environ.get('ROS_DISTRO', 'humble')
     plugin_path = os.path.join('/opt', 'ros', ros_distro, 'lib')
 
-    # ── 런치 인자 ──
+    # ── Launch arguments ──
     world_arg = DeclareLaunchArgument(
         'world',
         default_value=default_world,
-        description='Gazebo world SDF 파일 경로')
+        description='Path to Gazebo world SDF file')
 
     controller_delay_arg = DeclareLaunchArgument(
         'controller_delay',
         default_value='8.0',
-        description='Gazebo 기동 대기 시간 (초)')
+        description='Seconds to wait for Gazebo startup')
 
-    # ── 환경변수 ──
+    # ── Environment variables ──
     resource_path = os.path.join(description_pkg, os.pardir)
     existing_resource = os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')
     set_resource_path = SetEnvironmentVariable(
@@ -77,16 +77,16 @@ def generate_launch_description():
         'IGN_GAZEBO_SYSTEM_PLUGIN_PATH',
         plugin_path + (':' + existing_plugin if existing_plugin else ''))
 
-    # ── URDF 처리 ──
+    # ── URDF processing ──
     urdf_path = os.path.join(gazebo_pkg, 'urdf', 'antbot_sim.xacro')
     robot_description_xml = xacro.process_file(urdf_path).toxml()
 
-    # ── Gazebo 실행 ──
+    # ── Launch Gazebo ──
     ign_gazebo = ExecuteProcess(
         cmd=['ign', 'gazebo', '-r', LaunchConfiguration('world')],
         output='screen')
 
-    # ── 로봇 스폰 ──
+    # ── Spawn robot ──
     spawn_robot = Node(
         package='ros_gz_sim',
         executable='create',
@@ -107,11 +107,11 @@ def generate_launch_description():
             {'use_sim_time': True},
         ])
 
-    # ── 컨트롤러 설정 ──
+    # ── Controller configuration ──
     controller_yaml = os.path.join(
         gazebo_pkg, 'config', 'swerve_controller_gazebo.yaml')
 
-    # Gazebo 기동 대기 후 컨트롤러 스폰
+    # Wait for Gazebo startup, then spawn controllers
     wait_for_gazebo = OpaqueFunction(function=_spawn_controllers)
 
     jsb_spawner = Node(
@@ -136,13 +136,13 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
         output='screen')
 
-    # JSB 완료 후 스워브 컨트롤러 스폰
+    # Spawn swerve controller after JSB completes
     swerve_after_jsb = RegisterEventHandler(
         OnProcessExit(
             target_action=jsb_spawner,
             on_exit=[swerve_spawner]))
 
-    # ── Gazebo ↔ ROS 2 토픽 브릿지 ──
+    # ── Gazebo - ROS 2 topic bridge ──
     gz_bridge = Node(
         package='ros_gz_bridge',
         executable='parameter_bridge',
@@ -158,20 +158,20 @@ def generate_launch_description():
         output='screen')
 
     return LaunchDescription([
-        # 인자
+        # Arguments
         world_arg,
         controller_delay_arg,
-        # 환경변수
+        # Environment
         set_resource_path,
         set_plugin_path,
         # Gazebo
         ign_gazebo,
         spawn_robot,
         robot_state_pub,
-        # 컨트롤러 (대기 → JSB → 스워브 순차 스폰)
+        # Controllers (wait -> JSB -> swerve sequential spawn)
         wait_for_gazebo,
         jsb_spawner,
         swerve_after_jsb,
-        # 토픽 브릿지
+        # Topic bridge
         gz_bridge,
     ])

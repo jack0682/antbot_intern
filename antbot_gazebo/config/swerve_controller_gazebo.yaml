@@ -1,9 +1,9 @@
 # Copyright 2026 ROBOTIS AI CO., LTD.
 # Licensed under the Apache License, Version 2.0
 #
-# Gazebo 시뮬레이션 전용 스워브 컨트롤러 설정.
-# IgnitionSystem에 맞게 가속 인터페이스를 비활성화하고
-# 시뮬 환경에 적합한 튜닝값을 사용합니다.
+# Gazebo simulation swerve controller configuration.
+# Disables acceleration interfaces (unsupported by IgnitionSystem)
+# and uses simulation-specific tuning values.
 
 controller_manager:
   ros__parameters:
@@ -33,7 +33,7 @@ antbot_swerve_controller:
     module_wheel_speed_limit_lower: [ -50.0, -50.0, -50.0, -50.0 ]
     module_wheel_speed_limit_upper: [ 50.0, 50.0, 50.0, 50.0 ]
 
-    # IgnitionSystem은 가속 인터페이스 미지원
+    # IgnitionSystem does not support acceleration interface
     steering:
       use_velocity_command: false
       use_acceleration_command: false
@@ -43,7 +43,7 @@ antbot_swerve_controller:
     wheel:
       use_acceleration_command: false
 
-    # 시뮬 튜닝
+    # Simulation tuning
     non_coaxial_ik_iterations: 3
     enable_steering_scrub_compensator: false
     velocity_rolling_window_size: 10

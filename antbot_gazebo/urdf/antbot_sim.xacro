@@ -2,21 +2,21 @@
 <!-- Copyright 2026 ROBOTIS AI CO., LTD.
      Licensed under the Apache License, Version 2.0 -->
 <!--
-  ANTBot 시뮬레이션용 URDF.
-  antbot_description의 공유 xacro(base, wheel, sensors)를 그대로 사용하고,
-  하드웨어 인터페이스와 Gazebo 플러그인만 이 패키지에서 정의합니다.
+  ANTBot simulation URDF.
+  Reuses shared xacro macros (base, wheel, sensors) from antbot_description.
+  Hardware interface and Gazebo plugins are defined in this package.
 -->
 <robot name="antbot" xmlns:xacro="http://ros.org/wiki/xacro">
-  <!-- antbot_description에서 공유 매크로 가져오기 -->
+  <!-- Import shared macros from antbot_description -->
   <xacro:include filename="$(find antbot_description)/urdf/sensors.xacro"/>
   <xacro:include filename="$(find antbot_description)/urdf/base.xacro"/>
   <xacro:include filename="$(find antbot_description)/urdf/wheel.xacro"/>
 
-  <!-- antbot_gazebo 자체 정의 -->
+  <!-- antbot_gazebo definitions -->
   <xacro:include filename="$(find antbot_gazebo)/urdf/ros2_control_gazebo.xacro"/>
   <xacro:include filename="$(find antbot_gazebo)/urdf/gazebo_plugins.xacro"/>
 
-  <!-- 휠 파라미터 -->
+  <!-- Wheel parameters -->
   <xacro:property name="wheelbase_length" value="0.530"/>
   <xacro:property name="wheelbase_width" value="0.512"/>
   <xacro:property name="steering_width" value="0.401"/>
@@ -24,10 +24,10 @@
   <xacro:property name="steering_height" value="0.120"/>
   <xacro:property name="wheel_offset" value="${(wheelbase_width - steering_width)/2}"/>
 
-  <!-- 본체 -->
+  <!-- Base body -->
   <xacro:Base/>
 
-  <!-- 스워브 휠 4개 -->
+  <!-- 4 swerve wheels -->
   <xacro:SwerveWheelLeft position_name="front_left"
                          x_pos="${wheelbase_length/2}" y_pos="${steering_width/2}"/>
   <xacro:SwerveWheelRight position_name="front_right"
@@ -37,13 +37,13 @@
   <xacro:SwerveWheelRight position_name="rear_right"
                           x_pos="${-wheelbase_length/2}" y_pos="${-steering_width/2}"/>
 
-  <!-- 스테레오 카메라 -->
+  <!-- Stereo camera -->
   <xacro:Sensors name="camera_stereo_front_depth" xyz="0.348162 0.0475 0.526484" rpy="0.0 ${radians(30)} 0.0"/>
   <xacro:OpticalFrame name="camera_stereo_front_depth_optical" parent="camera_stereo_front_depth"/>
   <xacro:SensorsRel parent="camera_stereo_front_depth" child="camera_stereo_front_rgb" xyz="0.0 -0.124 0.0" rpy="0.0 0.0 0.0"/>
   <xacro:OpticalFrame name="camera_stereo_front_rgb_optical" parent="camera_stereo_front_rgb"/>
 
-  <!-- 모노 카메라 -->
+  <!-- Mono cameras -->
   <xacro:Sensors name="camera_mono_left" xyz="0.260 0.25477 0.5875" rpy="0.0 0.0 ${radians(90)}"/>
   <xacro:OpticalFrame name="camera_mono_left_optical" parent="camera_mono_left"/>
   <xacro:Sensors name="camera_mono_front" xyz="0.35807 0.0 0.5875" rpy="0.0 0.0 0.0"/>
@@ -53,7 +53,7 @@
   <xacro:Sensors name="camera_mono_back" xyz="-0.37669 0.0 0.299" rpy="0.0 0.0 ${radians(180)}"/>
   <xacro:OpticalFrame name="camera_mono_back_optical" parent="camera_mono_back"/>
 
-  <!-- IMU / GNSS / 지자기 -->
+  <!-- IMU / GNSS / Magnetometer -->
   <xacro:Sensors name="imu" xyz="0.240 0.00675 0.3902" rpy="0.0 0.0 ${radians(180)}"/>
   <xacro:Sensors name="gnss" xyz="0.2026 -0.128 0.660" rpy="0.0 0.0 ${radians(180)}"/>
   <xacro:Sensors name="magnetometer" xyz="0.240 -0.00425 0.3902" rpy="0.0 0.0 0.0"/>
@@ -66,9 +66,9 @@
   <xacro:Sensors name="lidar_3d" xyz="0.225332 0.0 0.724904" rpy="0.0 ${radians(10)} 0.0"/>
   <xacro:SensorsRel parent="lidar_3d" child="lidar_3d_imu" xyz="-0.00559 -0.00571 -0.02668" rpy="0.0 0.0 0.0"/>
 
-  <!-- 충전 코일 -->
+  <!-- Charging coil -->
   <xacro:Sensors name="robot_charging_coil" xyz="-0.299119 0.0 0.170631" rpy="0.0 0.0 0.0"/>
 
-  <!-- Gazebo용 ros2_control -->
+  <!-- Gazebo ros2_control -->
   <xacro:antbot_ros2_control_gazebo/>
 </robot>
