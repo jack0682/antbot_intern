@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!-- Copyright 2026 ROBOTIS AI CO., LTD.
+     Licensed under the Apache License, Version 2.0 -->
+<!--
+  Gazebo 시뮬레이션용 ros2_control 하드웨어 인터페이스.
+  실물의 BoardInterface 대신 IgnitionSystem을 사용합니다.
+  IgnitionSystem은 acceleration/effort 인터페이스를 지원하지 않으므로 제외합니다.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="antbot_ros2_control_gazebo">
+    <ros2_control name="ant_hardware" type="system">
+      <hardware>
+        <plugin>ign_ros2_control/IgnitionSystem</plugin>
+      </hardware>
+
+      <!-- 휠 조인트: 속도 명령 / 위치·속도 상태 -->
+      <joint name="wheel_front_left_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="velocity"/>
+        <state_interface name="position"/>
+      </joint>
+      <joint name="wheel_front_right_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="velocity"/>
+        <state_interface name="position"/>
+      </joint>
+      <joint name="wheel_rear_left_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="velocity"/>
+        <state_interface name="position"/>
+      </joint>
+      <joint name="wheel_rear_right_joint">
+        <command_interface name="velocity"/>
+        <state_interface name="velocity"/>
+        <state_interface name="position"/>
+      </joint>
+
+      <!-- 스티어링 조인트: 위치 명령 / 위치·속도 상태 -->
+      <joint name="steering_front_left_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="steering_front_right_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="steering_rear_left_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="steering_rear_right_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+      </joint>
+    </ros2_control>
+  </xacro:macro>
+
+</robot>
