@@ -14,28 +14,7 @@ Custom tuning is applied for the 4-wheel independent swerve-drive characteristic
 
 ### Nav2 Pipeline
 
-```
-User sets goal
-       │
-       ▼
-┌─ BT Navigator ─────────────────────────────────┐
-│  Behavior tree orchestration                     │
-│                                                  │
-│  ┌──────────────┐    ┌───────────────────┐      │
-│  │ Planner      │    │ Controller        │      │
-│  │ Server       │───▶│ Server            │      │
-│  │ NavFn(A*)    │    │ MPPI Omni         │      │
-│  └──────┬───────┘    └────────┬──────────┘      │
-│  ┌──────▼───────┐    ┌───────▼──────────┐       │
-│  │ Global       │    │ Local            │       │
-│  │ Costmap      │    │ Costmap          │       │
-│  └──────────────┘    └──────────────────┘       │
-│  ┌──────────────┐                               │
-│  │ Behavior     │  spin, backup, wait           │
-│  │ Server       │                               │
-│  └──────────────┘                               │
-└──────────────────────────────────────────────────┘
-```
+![Nav2 Pipeline](../../../../assets/images/nav2_pipeline_en.png)
 
 ### AntBot vs Standard diff-drive
 
@@ -134,16 +113,7 @@ ros2 launch antbot_navigation slam.launch.py mode:=real   # real robot
 
 ### TF Tree
 
-```
-       map
-        │  ← AMCL (particle filter localization)
-       odom
-        │  ← EKF (wheel odom + IMU fusion)
-     base_link
-        ├── lidar_2d_front_link, lidar_2d_back_link
-        ├── imu_link
-        └── steering/wheel links
-```
+![TF Tree](../../../../assets/images/tf_tree.png)
 
 | Transform | Publisher |
 |-----------|----------|
