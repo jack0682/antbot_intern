@@ -17,6 +17,8 @@
 # 사용법:
 #   ros2 launch antbot_gazebo gazebo.launch.py
 #   ros2 launch antbot_gazebo gazebo.launch.py world:=/path/to/world.sdf
+# 
+# Author: Yeeun Hwang
 
 import os
 
