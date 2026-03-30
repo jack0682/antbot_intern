@@ -7,6 +7,9 @@
 #   - Lower MPPI batch_size for Jetson Orin compute budget
 #   - Tighter goal tolerances
 
+# Robot footprint defined once, referenced by both local and global costmaps.
+robot_footprint: &robot_footprint "[[0.35, 0.30], [0.35, -0.30], [-0.35, -0.30], [-0.35, 0.30]]"
+
 bt_navigator:
   ros__parameters:
     global_frame: map
@@ -159,7 +162,7 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.05
-      footprint: "[[0.35, 0.30], [0.35, -0.30], [-0.35, -0.30], [-0.35, 0.30]]"
+      footprint: *robot_footprint
       plugins: ["obstacle_layer_front", "obstacle_layer_back", "inflation_layer"]
       obstacle_layer_front:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -202,7 +205,7 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      footprint: "[[0.35, 0.30], [0.35, -0.30], [-0.35, -0.30], [-0.35, 0.30]]"
+      footprint: *robot_footprint
       resolution: 0.05
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer_front", "obstacle_layer_back", "inflation_layer"]
