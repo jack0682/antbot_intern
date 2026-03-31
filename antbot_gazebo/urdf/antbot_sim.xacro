@@ -1,11 +1,4 @@
 <?xml version="1.0" ?>
-<!-- Copyright 2026 ROBOTIS AI CO., LTD.
-     Licensed under the Apache License, Version 2.0 -->
-<!--
-  ANTBot simulation URDF.
-  Reuses shared xacro macros (base, wheel, sensors) from antbot_description.
-  Hardware interface and Gazebo plugins are defined in this package.
--->
 <robot name="antbot" xmlns:xacro="http://ros.org/wiki/xacro">
   <!-- Import shared macros from antbot_description -->
   <xacro:include filename="$(find antbot_description)/urdf/sensors.xacro"/>

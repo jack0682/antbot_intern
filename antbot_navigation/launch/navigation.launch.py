@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Full Nav2 navigation with saved map (AMCL + MPPI + Nav2 planning).
-# Requires the robot to be running first (bringup.launch.py or sim.launch.py).
-# Usage:
-#   ros2 launch antbot_navigation navigation.launch.py mode:=sim world:=depot
-#   ros2 launch antbot_navigation navigation.launch.py mode:=sim map:=/path/to/map.yaml
-#   ros2 launch antbot_navigation navigation.launch.py mode:=real map:=/path/to/map.yaml
-#
 # Author: Jaehong Oh
 
 import os

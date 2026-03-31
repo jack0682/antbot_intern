@@ -12,12 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Localization-only mode: EKF + AMCL + map_server, no planning/navigation.
-# Useful for testing localization before enabling full navigation.
-# Usage:
-#   ros2 launch antbot_navigation localization.launch.py mode:=sim map:=<map.yaml>
-#   ros2 launch antbot_navigation localization.launch.py mode:=real map:=<map.yaml>
-#
 # Author: Jaehong Oh
 
 from ament_index_python.packages import get_package_share_directory

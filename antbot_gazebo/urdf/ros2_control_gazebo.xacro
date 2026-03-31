@@ -1,11 +1,4 @@
 <?xml version="1.0"?>
-<!-- Copyright 2026 ROBOTIS AI CO., LTD.
-     Licensed under the Apache License, Version 2.0 -->
-<!--
-  Gazebo simulation ros2_control hardware interface.
-  Uses IgnitionSystem instead of the real BoardInterface.
-  Excludes acceleration/effort interfaces (unsupported by IgnitionSystem).
--->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:macro name="antbot_ros2_control_gazebo">

@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# SLAM mapping mode: builds a map while allowing navigation.
-# Usage:
-#   ros2 launch antbot_navigation slam.launch.py              # sim (default)
-#   ros2 launch antbot_navigation slam.launch.py mode:=real   # real robot
-#
 # Author: Jaehong Oh
 
 from ament_index_python.packages import get_package_share_directory
