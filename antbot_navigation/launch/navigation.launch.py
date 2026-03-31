@@ -144,8 +144,9 @@ def generate_launch_description():
         parameters=[nav2_params_file, {'use_sim_time': use_sim_time}])
 
     # Delay Nav2 nodes to allow EKF to publish odom->base_link TF first
+    # EKF needs time to receive odom + IMU and start publishing TF
     delayed_nav2 = TimerAction(
-        period=2.0,
+        period=8.0,
         actions=[
             map_server_node,
             amcl_node,

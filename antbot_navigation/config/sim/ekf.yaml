@@ -27,8 +27,8 @@ ekf_filter_node:
     # Reject wheel odom spikes from wall collisions
     odom0_rejection_threshold: 2.0
 
-    # IMU from dedicated IMU node
-    imu0: /imu_node/imu/accel_gyro
+    # IMU from Gazebo simulation (bridged via ros_gz_bridge)
+    imu0: /imu/data
     imu0_config: [false, false, false,   # x, y, z
                   false, false, true,     # roll, pitch, yaw
                   false, false, false,    # vx, vy, vz
