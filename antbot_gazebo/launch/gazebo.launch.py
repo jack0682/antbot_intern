@@ -131,40 +131,40 @@ def generate_launch_description():
     controller_yaml = os.path.join(
         gazebo_pkg, 'config', 'swerve_controller_gazebo.yaml')
 
-    # ── Wait for gz_ros2_control to load controllers, then activate ──
-    # gz_ros2_control plugin auto-loads controllers from YAML.
-    # We poll until controllers appear in 'unconfigured' state, then
-    # configure and activate them via service calls (no spawner conflict).
-    activate_controllers = ExecuteProcess(
-        cmd=[
-            'bash', '-c',
-            'echo "[gazebo.launch] Waiting for controllers to be loaded by gz_ros2_control..." && '
-            'until ros2 control list_controllers 2>/dev/null '
-            '| grep -q unconfigured; do sleep 1; done && '
-            'echo "[gazebo.launch] Controllers loaded, configuring and activating..." && '
-            'ros2 service call /controller_manager/configure_controller '
-            'controller_manager_msgs/srv/ConfigureController '
-            '"{name: joint_state_broadcaster}" && '
-            'ros2 service call /controller_manager/switch_controller '
-            'controller_manager_msgs/srv/SwitchController '
-            '"{activate_controllers: [joint_state_broadcaster], '
-            'deactivate_controllers: [], strictness: 1}" && '
-            'ros2 service call /controller_manager/configure_controller '
-            'controller_manager_msgs/srv/ConfigureController '
-            '"{name: antbot_swerve_controller}" && '
-            'ros2 service call /controller_manager/switch_controller '
-            'controller_manager_msgs/srv/SwitchController '
-            '"{activate_controllers: [antbot_swerve_controller], '
-            'deactivate_controllers: [], strictness: 1}" && '
-            'echo "[gazebo.launch] All controllers active."'
+    # ── Controller spawners ──
+    jsb_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'joint_state_broadcaster',
+            '--param-file', controller_yaml,
+            '--controller-manager-timeout', '30',
         ],
+        parameters=[{'use_sim_time': True}],
         output='screen')
 
-    # Start controller activation after robot entity is created in Gazebo
-    controllers_after_spawn = RegisterEventHandler(
+    swerve_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=[
+            'antbot_swerve_controller',
+            '--param-file', controller_yaml,
+            '--controller-manager-timeout', '30',
+        ],
+        parameters=[{'use_sim_time': True}],
+        output='screen')
+
+    # Spawn JSB after robot is created in Gazebo
+    jsb_after_spawn = RegisterEventHandler(
         OnProcessExit(
             target_action=spawn_robot,
-            on_exit=[activate_controllers]))
+            on_exit=[jsb_spawner]))
+
+    # Spawn swerve controller after JSB completes
+    swerve_after_jsb = RegisterEventHandler(
+        OnProcessExit(
+            target_action=jsb_spawner,
+            on_exit=[swerve_spawner]))
 
     # ── Gazebo - ROS 2 topic bridge ──
     gz_bridge = Node(
@@ -191,8 +191,9 @@ def generate_launch_description():
         ign_gazebo,
         spawn_robot,
         robot_state_pub,
-        # Controllers (spawn_robot exit → poll hardware → JSB → swerve)
-        controllers_after_spawn,
+        # Controllers (spawn_robot exit → JSB → swerve)
+        jsb_after_spawn,
+        swerve_after_jsb,
         # Topic bridge
         gz_bridge,
     ])
