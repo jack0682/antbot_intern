@@ -7,6 +7,7 @@
   <version>0.1.0</version>
   <description>Ignition Gazebo simulation package for ANTBot</description>
   <maintainer email="osh@robotis.com">SungHyeon Oh</maintainer>
+  <maintainer email="yeeunhsara214@gmail.com">Yeeun Hwang</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
