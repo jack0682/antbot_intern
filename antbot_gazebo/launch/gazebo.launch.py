@@ -131,6 +131,18 @@ def generate_launch_description():
     controller_yaml = os.path.join(
         gazebo_pkg, 'config', 'swerve_controller_gazebo.yaml')
 
+    # Wait for controller_manager to be fully ready
+    wait_for_cm = ExecuteProcess(
+        cmd=[
+            'bash', '-c',
+            'echo "[gazebo.launch] Waiting for controller_manager..." && '
+            'until ros2 service list 2>/dev/null | grep -q /controller_manager/list_controllers; '
+            'do sleep 1; done && '
+            'sleep 2 && '
+            'echo "[gazebo.launch] controller_manager is ready."'
+        ],
+        output='screen')
+
     # ── Controller spawners ──
     jsb_spawner = Node(
         package='controller_manager',
@@ -154,10 +166,16 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
         output='screen')
 
-    # Spawn JSB after robot is created in Gazebo
-    jsb_after_spawn = RegisterEventHandler(
+    # Wait for controller_manager after robot spawn
+    wait_after_spawn = RegisterEventHandler(
         OnProcessExit(
             target_action=spawn_robot,
+            on_exit=[wait_for_cm]))
+
+    # Spawn JSB after controller_manager is ready
+    jsb_after_cm = RegisterEventHandler(
+        OnProcessExit(
+            target_action=wait_for_cm,
             on_exit=[jsb_spawner]))
 
     # Spawn swerve controller after JSB completes
@@ -191,8 +209,9 @@ def generate_launch_description():
         ign_gazebo,
         spawn_robot,
         robot_state_pub,
-        # Controllers (spawn_robot exit → JSB → swerve)
-        jsb_after_spawn,
+        # Controllers (spawn_robot exit → wait for CM → JSB → swerve)
+        wait_after_spawn,
+        jsb_after_cm,
         swerve_after_jsb,
         # Topic bridge
         gz_bridge,
