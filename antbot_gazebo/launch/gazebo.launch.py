@@ -48,21 +48,21 @@ def _resolve_world_path(context, *args, **kwargs):
         world_sdf = world_value
     else:
         # Treat as a world name — look up in worlds.yaml
-        nav_pkg = get_package_share_directory('antbot_navigation')
-        maps_dir = os.path.join(nav_pkg, 'maps')
-        worlds_yaml = os.path.join(maps_dir, 'worlds.yaml')
+        gazebo_pkg = get_package_share_directory('antbot_gazebo')
+        worlds_yaml = os.path.join(gazebo_pkg, 'config', 'worlds.yaml')
+        worlds_dir = os.path.join(gazebo_pkg, 'worlds')
 
         if os.path.isfile(worlds_yaml):
             with open(worlds_yaml, 'r') as f:
                 config = yaml.safe_load(f)
             worlds = config.get('worlds', {})
             if world_value in worlds:
-                world_sdf = os.path.join(maps_dir, worlds[world_value]['sdf'])
+                world_sdf = os.path.join(worlds_dir, worlds[world_value]['sdf'])
             else:
-                # Fallback: try as filename in maps directory
-                world_sdf = os.path.join(maps_dir, world_value + '.sdf')
+                # Fallback: try as filename in worlds directory
+                world_sdf = os.path.join(worlds_dir, world_value + '.sdf')
         else:
-            world_sdf = os.path.join(maps_dir, world_value + '.sdf')
+            world_sdf = os.path.join(worlds_dir, world_value + '.sdf')
 
         if not os.path.isfile(world_sdf):
             raise FileNotFoundError(

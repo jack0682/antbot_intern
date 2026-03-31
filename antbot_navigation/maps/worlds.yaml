@@ -1,13 +1,7 @@
-# World configuration for AntBot simulation
-# Maps world names to their SDF world file and Nav2 map file.
-# Usage: ros2 launch antbot_gazebo gazebo.launch.py world:=depot
-#        ros2 launch antbot_navigation navigation.launch.py world:=depot mode:=sim
+# World configuration for AntBot Nav2 navigation
+# Maps world names to their Nav2 map files.
+# Usage: ros2 launch antbot_navigation navigation.launch.py mode:=sim world:=depot
 
 worlds:
   depot:
-    sdf: depot.sdf
     map: depot_sim.yaml
-  # empty world uses the SDF bundled with antbot_gazebo
-  # empty:
-  #   sdf: empty.sdf
-  #   map: ""
