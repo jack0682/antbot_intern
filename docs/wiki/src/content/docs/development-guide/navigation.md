@@ -44,24 +44,27 @@ sudo apt install ros-humble-navigation2 ros-humble-nav2-bringup \
 **Terminal 1 — Gazebo 시뮬레이션**
 
 ```bash
-ros2 launch antbot_gazebo gazebo.launch.py
+ros2 launch antbot_gazebo gazebo.launch.py \
+  world:=$(ros2 pkg prefix antbot_gazebo --share)/worlds/depot.sdf
 ```
 
 :::note
 Gazebo 창이 나타나고 컨트롤러가 로드될 때까지 약 8~15초가 소요됩니다.
+기본 월드는 `empty.sdf`이며, depot 월드를 사용하면 `depot_sim` 맵과 매칭됩니다.
 :::
 
 **Terminal 2 — Nav2 네비게이션**
 
 ```bash
 ros2 launch antbot_navigation navigation.launch.py mode:=sim \
-  map:=$(ros2 pkg prefix antbot_navigation)/share/antbot_navigation/maps/depot_sim.yaml
+  map:=$(ros2 pkg prefix antbot_navigation --share)/maps/depot_sim.yaml
 ```
 
 **Terminal 3 — RViz 시각화**
 
 ```bash
-rviz2 -d $(ros2 pkg prefix antbot_navigation)/share/antbot_navigation/rviz/navigation.rviz
+rviz2 -d $(ros2 pkg prefix antbot_navigation --share)/rviz/navigation.rviz \
+  --ros-args -p use_sim_time:=true
 ```
 
 ### 로봇 이동시키기
@@ -125,8 +128,9 @@ ros2 launch antbot_navigation slam.launch.py mode:=real   # 실제 로봇
 
 :::caution
 swerve controller와 EKF가 동시에 `odom→base_link` TF를 발행하면 진동이 발생합니다.
-navigation launch가 3초 지연 후 자동으로 swerve controller의 TF 발행을 비활성화하지만,
-타이밍 문제로 실패할 수 있습니다. 진동이 보이면 수동으로 비활성화하세요:
+navigation launch가 자동으로 swerve controller의 TF 발행을 비활성화하며,
+Nav2 노드는 EKF가 TF를 발행할 수 있도록 8초 지연 후 시작됩니다.
+진동이 보이면 수동으로 비활성화하세요:
 
 ```bash
 ros2 param set /antbot_swerve_controller enable_odom_tf false
@@ -180,12 +184,17 @@ amcl:
 
 ```yaml
 odom0: /odom                    # vx, vy, vyaw
-imu0: /imu_node/imu/accel_gyro  # yaw, vyaw (differential mode)
+imu0: /imu/data                 # yaw, vyaw (differential mode) — sim
+# imu0: /imu_node/imu/accel_gyro  # real robot
 odom0_rejection_threshold: 2.0  # 충돌 스파이크 거부
 ```
 
 :::note[충돌 보호]
 벽 충돌 시 바퀴 슬립으로 wheel velocity 스파이크가 발생하면 `odom0_rejection_threshold`로 자동 무시되어 odom 드리프트를 방지합니다.
+:::
+
+:::caution[Sim vs Real IMU 토픽]
+시뮬레이션에서는 Gazebo ros_gz_bridge가 IMU를 `/imu/data`로 발행하고, 실제 로봇에서는 `/imu_node/imu/accel_gyro`를 사용합니다. `config/sim/ekf.yaml`과 `config/real/ekf.yaml`에 각각 올바른 토픽이 설정되어 있습니다.
 :::
 
 ### Costmap
