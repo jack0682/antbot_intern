@@ -15,9 +15,12 @@
 # ANTBot Ignition Gazebo simulation launch file.
 #
 # Usage:
-#   ros2 launch antbot_gazebo gazebo.launch.py
-#   ros2 launch antbot_gazebo gazebo.launch.py world:=/path/to/world.sdf
-# 
+#   ros2 launch antbot_gazebo gazebo.launch.py                  # empty world
+#   ros2 launch antbot_gazebo gazebo.launch.py world:=depot      # by name
+#   ros2 launch antbot_gazebo gazebo.launch.py world:=/full/path/to/world.sdf
+#
+# World names are resolved via antbot_navigation/maps/worlds.yaml.
+#
 # Author: Yeeun Hwang
 
 import os
@@ -33,6 +36,41 @@ from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import xacro
+import yaml
+
+
+def _resolve_world_path(context, *args, **kwargs):
+    """Resolve world name to SDF path using worlds.yaml, then launch Gazebo."""
+    world_value = LaunchConfiguration('world').perform(context)
+
+    # If it's already a full path, use it directly
+    if os.path.isfile(world_value):
+        world_sdf = world_value
+    else:
+        # Treat as a world name — look up in worlds.yaml
+        nav_pkg = get_package_share_directory('antbot_navigation')
+        maps_dir = os.path.join(nav_pkg, 'maps')
+        worlds_yaml = os.path.join(maps_dir, 'worlds.yaml')
+
+        if os.path.isfile(worlds_yaml):
+            with open(worlds_yaml, 'r') as f:
+                config = yaml.safe_load(f)
+            worlds = config.get('worlds', {})
+            if world_value in worlds:
+                world_sdf = os.path.join(maps_dir, worlds[world_value]['sdf'])
+            else:
+                # Fallback: try as filename in maps directory
+                world_sdf = os.path.join(maps_dir, world_value + '.sdf')
+        else:
+            world_sdf = os.path.join(maps_dir, world_value + '.sdf')
+
+        if not os.path.isfile(world_sdf):
+            raise FileNotFoundError(
+                f"World '{world_value}' not found. Looked for: {world_sdf}")
+
+    return [ExecuteProcess(
+        cmd=['ign', 'gazebo', '-r', world_sdf],
+        output='screen')]
 
 
 def _spawn_controllers(context, *args, **kwargs):
@@ -47,9 +85,6 @@ def generate_launch_description():
     gazebo_pkg = get_package_share_directory('antbot_gazebo')
     description_pkg = get_package_share_directory('antbot_description')
 
-    # Default world file
-    default_world = os.path.join(gazebo_pkg, 'worlds', 'empty.sdf')
-
     # Plugin path based on ROS distro
     ros_distro = os.environ.get('ROS_DISTRO', 'humble')
     plugin_path = os.path.join('/opt', 'ros', ros_distro, 'lib')
@@ -57,8 +92,8 @@ def generate_launch_description():
     # ── Launch arguments ──
     world_arg = DeclareLaunchArgument(
         'world',
-        default_value=default_world,
-        description='Path to Gazebo world SDF file')
+        default_value='empty',
+        description='World name (from worlds.yaml) or full path to SDF file')
 
     controller_delay_arg = DeclareLaunchArgument(
         'controller_delay',
@@ -81,10 +116,8 @@ def generate_launch_description():
     urdf_path = os.path.join(gazebo_pkg, 'urdf', 'antbot_sim.xacro')
     robot_description_xml = xacro.process_file(urdf_path).toxml()
 
-    # ── Launch Gazebo ──
-    ign_gazebo = ExecuteProcess(
-        cmd=['ign', 'gazebo', '-r', LaunchConfiguration('world')],
-        output='screen')
+    # ── Launch Gazebo (resolved via OpaqueFunction) ──
+    ign_gazebo = OpaqueFunction(function=_resolve_world_path)
 
     # ── Spawn robot ──
     spawn_robot = Node(

@@ -15,52 +15,66 @@
 # Full Nav2 navigation with saved map (AMCL + MPPI + Nav2 planning).
 # Requires the robot to be running first (bringup.launch.py or sim.launch.py).
 # Usage:
-#   ros2 launch antbot_navigation navigation.launch.py mode:=sim map:=<map.yaml>
-#   ros2 launch antbot_navigation navigation.launch.py mode:=real map:=<map.yaml>
+#   ros2 launch antbot_navigation navigation.launch.py mode:=sim world:=depot
+#   ros2 launch antbot_navigation navigation.launch.py mode:=sim map:=/path/to/map.yaml
+#   ros2 launch antbot_navigation navigation.launch.py mode:=real map:=/path/to/map.yaml
 #
 # Author: Jaehong Oh
+
+import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import ExecuteProcess
+from launch.actions import OpaqueFunction
 from launch.actions import TimerAction
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
 from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
+import yaml
 
 
-def generate_launch_description():
+def _resolve_map_and_launch(context, *args, **kwargs):
+    """Resolve map path from world name or map argument, then launch Nav2."""
     pkg_dir = get_package_share_directory('antbot_navigation')
+    mode = LaunchConfiguration('mode').perform(context)
+    map_value = LaunchConfiguration('map').perform(context)
+    world_value = LaunchConfiguration('world').perform(context)
 
-    mode_arg = DeclareLaunchArgument(
-        'mode',
-        default_value='sim',
-        choices=['sim', 'real'],
-        description='Operating mode: sim (Gazebo) or real (physical robot)')
+    # Resolve map path
+    if map_value:
+        # Explicit map path provided
+        map_yaml = map_value
+    elif world_value:
+        # Resolve from worlds.yaml
+        maps_dir = os.path.join(pkg_dir, 'maps')
+        worlds_yaml = os.path.join(maps_dir, 'worlds.yaml')
 
-    map_arg = DeclareLaunchArgument(
-        'map',
-        description='Full path to the map YAML file (e.g., maps/depot_sim.yaml)')
+        if os.path.isfile(worlds_yaml):
+            with open(worlds_yaml, 'r') as f:
+                config = yaml.safe_load(f)
+            worlds = config.get('worlds', {})
+            if world_value in worlds and worlds[world_value].get('map'):
+                map_yaml = os.path.join(maps_dir, worlds[world_value]['map'])
+            else:
+                raise ValueError(
+                    f"World '{world_value}' has no map defined in worlds.yaml")
+        else:
+            raise FileNotFoundError(f"worlds.yaml not found at {worlds_yaml}")
+    else:
+        raise ValueError("Either 'world' or 'map' argument must be provided")
 
-    mode = LaunchConfiguration('mode')
-    map_yaml = LaunchConfiguration('map')
+    if not os.path.isfile(map_yaml):
+        raise FileNotFoundError(f"Map file not found: {map_yaml}")
 
     # Resolve config paths based on mode
-    config_dir = PathJoinSubstitution([pkg_dir, 'config', mode])
-    nav2_params_file = PathJoinSubstitution([config_dir, 'nav2_params.yaml'])
-    ekf_params_file = PathJoinSubstitution([config_dir, 'ekf.yaml'])
+    config_dir = os.path.join(pkg_dir, 'config', mode)
+    nav2_params_file = os.path.join(config_dir, 'nav2_params.yaml')
+    ekf_params_file = os.path.join(config_dir, 'ekf.yaml')
 
-    use_sim_time = PythonExpression(["'", mode, "' == 'sim'"])
-
-    # Disable swerve controller's odom TF so the EKF publishes it instead.
-    disable_odom_tf = TimerAction(
-        period=3.0,
-        actions=[ExecuteProcess(
-            cmd=['ros2', 'param', 'set',
-                 '/antbot_swerve_controller', 'enable_odom_tf', 'false'],
-            output='screen')])
+    use_sim_time = (mode == 'sim')
 
     # EKF sensor fusion (wheel odom + IMU) for odom->base_link TF
     ekf_node = Node(
@@ -143,6 +157,14 @@ def generate_launch_description():
         output='screen',
         parameters=[nav2_params_file, {'use_sim_time': use_sim_time}])
 
+    # Disable swerve controller's odom TF so the EKF publishes it instead.
+    disable_odom_tf = TimerAction(
+        period=3.0,
+        actions=[ExecuteProcess(
+            cmd=['ros2', 'param', 'set',
+                 '/antbot_swerve_controller', 'enable_odom_tf', 'false'],
+            output='screen')])
+
     # Delay Nav2 nodes to allow EKF to publish odom->base_link TF first
     # EKF needs time to receive odom + IMU and start publishing TF
     delayed_nav2 = TimerAction(
@@ -159,10 +181,29 @@ def generate_launch_description():
             lifecycle_manager_navigation,
         ])
 
+    return [disable_odom_tf, ekf_node, delayed_nav2]
+
+
+def generate_launch_description():
+    mode_arg = DeclareLaunchArgument(
+        'mode',
+        default_value='sim',
+        choices=['sim', 'real'],
+        description='Operating mode: sim (Gazebo) or real (physical robot)')
+
+    world_arg = DeclareLaunchArgument(
+        'world',
+        default_value='',
+        description='World name (from worlds.yaml) to auto-resolve map path')
+
+    map_arg = DeclareLaunchArgument(
+        'map',
+        default_value='',
+        description='Full path to map YAML file (overrides world argument)')
+
     return LaunchDescription([
         mode_arg,
+        world_arg,
         map_arg,
-        disable_odom_tf,
-        ekf_node,
-        delayed_nav2,
+        OpaqueFunction(function=_resolve_map_and_launch),
     ])
