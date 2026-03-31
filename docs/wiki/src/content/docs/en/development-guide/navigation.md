@@ -44,21 +44,27 @@ sudo apt install ros-humble-navigation2 ros-humble-nav2-bringup \
 **Terminal 1 — Gazebo Simulation**
 
 ```bash
-ros2 launch antbot_gazebo gazebo.launch.py \
-  world:=$(ros2 pkg prefix antbot_gazebo --share)/worlds/depot.sdf
+ros2 launch antbot_gazebo gazebo.launch.py world:=depot
 ```
 
 :::note
 Wait ~8-15 seconds for the Gazebo window and controller spawners to complete.
-The default world is `empty.sdf`; use the depot world to match the `depot_sim` map.
+The `world` argument accepts a world name registered in `worlds.yaml` or a full path to an SDF file.
 :::
 
 **Terminal 2 — Nav2 Navigation**
 
 ```bash
-ros2 launch antbot_navigation navigation.launch.py mode:=sim \
-  map:=$(ros2 pkg prefix antbot_navigation --share)/maps/depot_sim.yaml
+ros2 launch antbot_navigation navigation.launch.py mode:=sim world:=depot
 ```
+
+:::tip
+Using `world:=depot` automatically resolves the corresponding map file (`depot_sim.yaml`) from `worlds.yaml`. To specify a map path directly, use the `map:=` argument instead:
+```bash
+ros2 launch antbot_navigation navigation.launch.py mode:=sim \
+  map:=/path/to/my_map.yaml
+```
+:::
 
 **Terminal 3 — RViz**
 
@@ -92,6 +98,74 @@ Save map: `ros2 run nav2_map_server map_saver_cli -f ~/maps/my_map`
 
 ---
 
+## World and Map Management
+
+### Directory Structure
+
+World (SDF) and map (PGM/YAML) files are co-located in `antbot_navigation/maps/`:
+
+```
+antbot_navigation/maps/
+├── worlds.yaml          # World name → SDF/map path mapping
+├── depot.sdf            # Gazebo world file
+├── depot_sim.pgm        # 2D occupancy grid map
+└── depot_sim.yaml       # Map metadata (resolution, origin, etc.)
+```
+
+### worlds.yaml Configuration
+
+`worlds.yaml` maps world names to their SDF and Nav2 map files:
+
+```yaml
+worlds:
+  depot:
+    sdf: depot.sdf           # Gazebo world SDF
+    map: depot_sim.yaml       # Nav2 map YAML
+```
+
+When launching with `world:=depot`:
+- **Gazebo**: loads `maps/depot.sdf`
+- **Navigation**: passes `maps/depot_sim.yaml` to the map server
+
+### Adding a New World
+
+1. **Create a map with SLAM** (or import externally):
+
+   ```bash
+   # Start SLAM
+   ros2 launch antbot_navigation slam.launch.py mode:=sim
+   # Save map
+   ros2 run nav2_map_server map_saver_cli -f ~/maps/my_world
+   ```
+
+2. **Place files**: copy `my_world.pgm`, `my_world.yaml`, and `my_world.sdf` into `antbot_navigation/maps/`
+
+3. **Register in worlds.yaml**:
+
+   ```yaml
+   worlds:
+     depot:
+       sdf: depot.sdf
+       map: depot_sim.yaml
+     my_world:                    # New world
+       sdf: my_world.sdf
+       map: my_world.yaml
+   ```
+
+4. **Launch**:
+
+   ```bash
+   ros2 launch antbot_gazebo gazebo.launch.py world:=my_world
+   ros2 launch antbot_navigation navigation.launch.py mode:=sim world:=my_world
+   ```
+
+:::note
+New worlds can be added by editing `worlds.yaml` alone — no launch file changes needed.
+The `map` argument can still be used to override with any arbitrary map file path.
+:::
+
+---
+
 ## Sim / Real Mode
 
 All launch files accept a `mode` argument that auto-selects the config directory and `use_sim_time`:
@@ -105,8 +179,9 @@ ros2 launch antbot_navigation slam.launch.py mode:=real   # real robot
 |---------|-------------|--------------|
 | Config directory | `config/sim/` | `config/real/` |
 | `use_sim_time` | `true` | `false` |
-| MPPI `vx_max` | 5.0 m/s | 2.0 m/s |
+| MPPI `vx_max` | 1.0 m/s | 2.0 m/s |
 | Velocity smoother | [1.5, 0.15, 1.5] | [1.0, 0.10, 1.0] |
+| EKF IMU topic | `/imu/data` | `/imu_node/imu/accel_gyro` |
 | EKF process noise | Low (ideal sensors) | Higher (real noise) |
 | MPPI `batch_size` | 2000 | 1500 (Jetson Orin) |
 
@@ -145,14 +220,17 @@ Config files: `antbot_navigation/config/{sim,real}/`
 
 ### MPPI Controller
 
+AntBot's steering limit is **+/-60 degrees**, making pure crab motion physically impossible.
+Direction changes use a **rotate-in-place then drive-forward** pattern, and MPPI parameters are tuned accordingly.
+
 ```yaml
 FollowPath:
   plugin: "nav2_mppi_controller::MPPIController"
   motion_model: "Omni"
   time_steps: 56           # 2.8s lookahead
   batch_size: 2000
-  vx_max: 5.0              # sim (real: 2.0)
-  vy_max: 1.0              # limit lateral motion (sim, real: 0.5)
+  vx_max: 1.0              # sim (real: 2.0)
+  vy_max: 0.1              # nearly disabled (±60deg steering limit)
 ```
 
 #### MPPI Critics
@@ -161,12 +239,18 @@ FollowPath:
 |--------|--------|---------|
 | ConstraintCritic | 4.0 | Velocity constraint violation penalty |
 | GoalCritic | 5.0 | Goal approach reward |
-| **PreferForwardCritic** | **5.0** | **Forward-facing travel (swerve key)** |
-| **PathAngleCritic** | **5.0** | **Body angle = path direction (swerve key)** |
-| **TwirlingCritic** | **5.0** | **Suppress unnecessary spinning (swerve key)** |
+| **PreferForwardCritic** | **15.0** | **Strongly align heading with travel direction (swerve key)** |
+| **PathAngleCritic** | **15.0** | **Body angle = path direction (swerve key)** |
+| **TwirlingCritic** | **10.0** | **Suppress unnecessary spinning (swerve key)** |
 | ObstaclesCritic | — | Collision avoidance |
 | PathAlignCritic | 10.0 | Trajectory-path alignment |
 | PathFollowCritic | 5.0 | Global path following |
+
+:::note[Steering Limit and MPPI Tuning]
+`vy_max` is limited to 0.1 and `PreferForwardCritic` / `PathAngleCritic` weights are high,
+forcing MPPI to **rotate in place to align heading first, then drive forward** rather than crab-walking.
+Increasing `vy_max` causes the steering to hit its limits, producing unnatural motion.
+:::
 
 ### AMCL
 
@@ -189,20 +273,24 @@ imu0: /imu/data                 # yaw, vyaw (differential mode) — sim
 odom0_rejection_threshold: 2.0  # reject collision spikes
 ```
 
+:::note[Collision Protection]
+When wheel slip occurs during wall collisions, velocity spikes are automatically rejected by `odom0_rejection_threshold`, preventing odom drift.
+:::
+
 :::caution[Sim vs Real IMU Topic]
 In simulation, Gazebo ros_gz_bridge publishes IMU on `/imu/data`, while the real robot uses `/imu_node/imu/accel_gyro`. The correct topic is configured in `config/sim/ekf.yaml` and `config/real/ekf.yaml` respectively.
 :::
 
 ### Costmap
 
-Robot footprint 0.70m × 0.60m, dual LiDAR (`/scan_0` front + `/scan_1` back).
+Robot footprint 0.70m x 0.60m, dual LiDAR (`/scan_0` front + `/scan_1` back).
 
 | Aspect | Local Costmap | Global Costmap |
 |--------|---------------|----------------|
 | Frame | `odom` | `map` |
-| Size | 5m × 5m rolling | Full map |
+| Size | 5m x 5m rolling | Full map |
 | Update | 5Hz | 1Hz |
-| Layers | obstacle×2 + inflation | static + obstacle×2 + inflation |
+| Layers | obstacle x2 + inflation | static + obstacle x2 + inflation |
 
 ---
 
@@ -225,14 +313,22 @@ ros2 service call /global_costmap/clear_entirely_global_costmap nav2_msgs/srv/Cl
 ### Crab-walking
 
 Reduce `vy_max` or increase `PreferForwardCritic` weight.
+Since the steering limit is +/-60 degrees, `vy_max: 0.1` or lower is recommended.
+
+### Missing map frame / TF timeout
+
+If Gazebo is restarted, sim time resets to 0 and all TF buffers are invalidated.
+**Always restart Gazebo and Navigation together.**
 
 ### Diagnostic Commands
 
 ```bash
-ros2 topic hz /scan_0
-ros2 run tf2_ros tf2_echo map odom
+ros2 topic hz /scan_0                    # LiDAR check
+ros2 topic hz /odometry/filtered         # EKF output check
+ros2 run tf2_ros tf2_echo map odom       # TF check
 ros2 param get /antbot_swerve_controller enable_odom_tf
-ros2 lifecycle get /controller_server
+ros2 lifecycle get /controller_server    # Nav2 state
+ros2 control list_controllers            # Controller state
 ```
 
 :::tip
