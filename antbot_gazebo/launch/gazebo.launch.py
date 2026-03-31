@@ -73,14 +73,6 @@ def _resolve_world_path(context, *args, **kwargs):
         output='screen')]
 
 
-def _spawn_controllers(context, *args, **kwargs):
-    """Wait for Gazebo startup before spawning controllers."""
-    import time
-    delay = float(LaunchConfiguration('controller_delay').perform(context))
-    time.sleep(delay)
-    return []
-
-
 def generate_launch_description():
     gazebo_pkg = get_package_share_directory('antbot_gazebo')
     description_pkg = get_package_share_directory('antbot_description')
@@ -94,11 +86,6 @@ def generate_launch_description():
         'world',
         default_value='empty',
         description='World name (from worlds.yaml) or full path to SDF file')
-
-    controller_delay_arg = DeclareLaunchArgument(
-        'controller_delay',
-        default_value='8.0',
-        description='Seconds to wait for Gazebo startup')
 
     # ── Environment variables ──
     resource_path = os.path.join(description_pkg, os.pardir)
@@ -144,36 +131,40 @@ def generate_launch_description():
     controller_yaml = os.path.join(
         gazebo_pkg, 'config', 'swerve_controller_gazebo.yaml')
 
-    # Wait for Gazebo startup, then spawn controllers
-    wait_for_gazebo = OpaqueFunction(function=_spawn_controllers)
-
-    jsb_spawner = Node(
-        package='controller_manager',
-        executable='spawner',
-        arguments=[
-            'joint_state_broadcaster',
-            '--param-file', controller_yaml,
-            '--controller-manager-timeout', '30',
+    # ── Wait for gz_ros2_control to load controllers, then activate ──
+    # gz_ros2_control plugin auto-loads controllers from YAML.
+    # We poll until controllers appear in 'unconfigured' state, then
+    # configure and activate them via service calls (no spawner conflict).
+    activate_controllers = ExecuteProcess(
+        cmd=[
+            'bash', '-c',
+            'echo "[gazebo.launch] Waiting for controllers to be loaded by gz_ros2_control..." && '
+            'until ros2 control list_controllers 2>/dev/null '
+            '| grep -q unconfigured; do sleep 1; done && '
+            'echo "[gazebo.launch] Controllers loaded, configuring and activating..." && '
+            'ros2 service call /controller_manager/configure_controller '
+            'controller_manager_msgs/srv/ConfigureController '
+            '"{name: joint_state_broadcaster}" && '
+            'ros2 service call /controller_manager/switch_controller '
+            'controller_manager_msgs/srv/SwitchController '
+            '"{activate_controllers: [joint_state_broadcaster], '
+            'deactivate_controllers: [], strictness: 1}" && '
+            'ros2 service call /controller_manager/configure_controller '
+            'controller_manager_msgs/srv/ConfigureController '
+            '"{name: antbot_swerve_controller}" && '
+            'ros2 service call /controller_manager/switch_controller '
+            'controller_manager_msgs/srv/SwitchController '
+            '"{activate_controllers: [antbot_swerve_controller], '
+            'deactivate_controllers: [], strictness: 1}" && '
+            'echo "[gazebo.launch] All controllers active."'
         ],
-        parameters=[{'use_sim_time': True}],
         output='screen')
 
-    swerve_spawner = Node(
-        package='controller_manager',
-        executable='spawner',
-        arguments=[
-            'antbot_swerve_controller',
-            '--param-file', controller_yaml,
-            '--controller-manager-timeout', '30',
-        ],
-        parameters=[{'use_sim_time': True}],
-        output='screen')
-
-    # Spawn swerve controller after JSB completes
-    swerve_after_jsb = RegisterEventHandler(
+    # Start controller activation after robot entity is created in Gazebo
+    controllers_after_spawn = RegisterEventHandler(
         OnProcessExit(
-            target_action=jsb_spawner,
-            on_exit=[swerve_spawner]))
+            target_action=spawn_robot,
+            on_exit=[activate_controllers]))
 
     # ── Gazebo - ROS 2 topic bridge ──
     gz_bridge = Node(
@@ -193,7 +184,6 @@ def generate_launch_description():
     return LaunchDescription([
         # Arguments
         world_arg,
-        controller_delay_arg,
         # Environment
         set_resource_path,
         set_plugin_path,
@@ -201,10 +191,8 @@ def generate_launch_description():
         ign_gazebo,
         spawn_robot,
         robot_state_pub,
-        # Controllers (wait -> JSB -> swerve sequential spawn)
-        wait_for_gazebo,
-        jsb_spawner,
-        swerve_after_jsb,
+        # Controllers (spawn_robot exit → poll hardware → JSB → swerve)
+        controllers_after_spawn,
         # Topic bridge
         gz_bridge,
     ])
