@@ -222,10 +222,4 @@ worlds:
 
 `non_coaxial_ik_iterations`를 0으로 설정하면 스티어링-휠 간 55mm 오프셋으로 인한 드리프트가 발생합니다. 시뮬에서는 2~3으로 설정하세요.
 
-### URDF 모델만 확인
-
-```bash
-ros2 launch antbot_description description.launch.py
-```
-
 설치 및 빌드 방법은 [소프트웨어 환경 구축](/antbot/software/environment-setup/)을 참조하세요.
