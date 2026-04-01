@@ -73,28 +73,7 @@ Nav2 자율주행 연동은 [5.3 Nav2 연동](/antbot/development-guide/navigati
 
 ### 시뮬레이션 파이프라인
 
-```
-사용자 입력 (텔레옵 / Nav2)
-       │  /cmd_vel
-       ▼
-┌─ ROS 2 ───────────────────────────────────────┐
-│  controller_manager (100Hz)                    │
-│    ├── joint_state_broadcaster → /joint_states │
-│    └── swerve_drive_controller                 │
-│          ├── subscribes: /cmd_vel              │
-│          ├── publishes:  /odom, /tf            │
-│          └── command → IgnitionSystem          │
-│  robot_state_publisher → /tf (base_link → *)  │
-└────────────────────┬───────────────────────────┘
-               ros_gz_bridge
-┌────────────────────▼───────────────────────────┐
-│  Ignition Gazebo (Fortress)                    │
-│    ├── gpu_lidar (전방) → /scan_0              │
-│    ├── gpu_lidar (후방) → /scan_1              │
-│    ├── IMU → /imu/data                         │
-│    └── IgnitionSystem (ros2_control HW plugin) │
-└────────────────────────────────────────────────┘
-```
+![Simulation Pipeline](../../../assets/images/sim_pipeline.png)
 
 ### 런치 시퀀스
 
@@ -231,18 +210,22 @@ worlds:
 
 ## 트러블슈팅
 
-:::caution[트러블슈팅]
-**gpu_lidar가 range_min만 반환**
+### gpu_lidar가 range_min만 반환
+
 `render_engine`이 `ogre2`인지 확인하세요. `ogre`로 설정하면 모든 레이가 최소값만 반환합니다.
 
-**컨트롤러 활성화 실패**
+### 컨트롤러 활성화 실패
+
 `ros2 control list_controllers`로 컨트롤러 상태를 확인하세요. `unconfigured` 상태에서 멈춰 있다면 `gz_ros2_control` 플러그인이 정상 로드되었는지 Gazebo 로그를 확인합니다.
 
-**오도메트리 드리프트 발생**
+### 오도메트리 드리프트 발생
+
 `non_coaxial_ik_iterations`를 0으로 설정하면 스티어링-휠 간 55mm 오프셋으로 인한 드리프트가 발생합니다. 시뮬에서는 2~3으로 설정하세요.
 
-**URDF 모델만 확인**
-`ros2 launch antbot_description description.launch.py`
-:::
+### URDF 모델만 확인
+
+```bash
+ros2 launch antbot_description description.launch.py
+```
 
 설치 및 빌드 방법은 [소프트웨어 환경 구축](/antbot/software/environment-setup/)을 참조하세요.
