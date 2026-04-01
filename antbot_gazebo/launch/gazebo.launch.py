@@ -72,7 +72,8 @@ def generate_launch_description():
         'world',
         default_value='empty',
         description='World name (from worlds.yaml) or full path to SDF file')
-    resource_path = os.path.join(description_pkg, os.pardir)
+
+    resource_path = os.path.dirname(description_pkg)
     existing_resource = os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')
     set_resource_path = SetEnvironmentVariable(
         'IGN_GAZEBO_RESOURCE_PATH',
@@ -94,7 +95,7 @@ def generate_launch_description():
         arguments=[
             '-name', 'antbot',
             '-string', robot_description_xml,
-            '-x', '0.0', '-y', '0.0', '-z', '0.5',
+            '-x', '0.0', '-y', '0.0', '-z', '0.1',
         ],
         output='screen')
 
@@ -110,18 +111,7 @@ def generate_launch_description():
     controller_yaml = os.path.join(
         gazebo_pkg, 'config', 'swerve_controller_gazebo.yaml')
 
-    wait_for_cm = ExecuteProcess(
-        cmd=[
-            'bash', '-c',
-            'echo "[gazebo.launch] Waiting for controller_manager..." && '
-            'until ros2 service list 2>/dev/null | grep -q /controller_manager/list_controllers; '
-            'do sleep 1; done && '
-            'sleep 2 && '
-            'echo "[gazebo.launch] controller_manager is ready."'
-        ],
-        output='screen')
-
-    jsb_spawner = Node(
+    joint_state_broadcaster_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=[
@@ -132,7 +122,7 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
         output='screen')
 
-    swerve_spawner = Node(
+    swerve_controller_spawner = Node(
         package='controller_manager',
         executable='spawner',
         arguments=[
@@ -143,20 +133,15 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
         output='screen')
 
-    wait_after_spawn = RegisterEventHandler(
+    joint_state_broadcaster_after_spawn = RegisterEventHandler(
         OnProcessExit(
             target_action=spawn_robot,
-            on_exit=[wait_for_cm]))
+            on_exit=[joint_state_broadcaster_spawner]))
 
-    jsb_after_cm = RegisterEventHandler(
+    swerve_controller_after_joint_state_broadcaster = RegisterEventHandler(
         OnProcessExit(
-            target_action=wait_for_cm,
-            on_exit=[jsb_spawner]))
-
-    swerve_after_jsb = RegisterEventHandler(
-        OnProcessExit(
-            target_action=jsb_spawner,
-            on_exit=[swerve_spawner]))
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[swerve_controller_spawner]))
 
     gz_bridge = Node(
         package='ros_gz_bridge',
@@ -179,8 +164,7 @@ def generate_launch_description():
         ign_gazebo,
         spawn_robot,
         robot_state_pub,
-        wait_after_spawn,
-        jsb_after_cm,
-        swerve_after_jsb,
+        joint_state_broadcaster_after_spawn,
+        swerve_controller_after_joint_state_broadcaster,
         gz_bridge,
     ])
