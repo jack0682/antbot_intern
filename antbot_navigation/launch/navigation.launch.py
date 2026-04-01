@@ -23,8 +23,6 @@ from launch.actions import ExecuteProcess
 from launch.actions import OpaqueFunction
 from launch.actions import TimerAction
 from launch.substitutions import LaunchConfiguration
-from launch.substitutions import PathJoinSubstitution
-from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
 import yaml
 
@@ -55,12 +53,12 @@ def _resolve_map_and_launch(context, *args, **kwargs):
                 raise ValueError(
                     f"World '{world_value}' has no map defined in worlds.yaml")
         else:
-            raise FileNotFoundError(f"worlds.yaml not found at {worlds_yaml}")
+            raise FileNotFoundError(f'worlds.yaml not found at {worlds_yaml}')
     else:
         raise ValueError("Either 'world' or 'map' argument must be provided")
 
     if not os.path.isfile(map_yaml):
-        raise FileNotFoundError(f"Map file not found: {map_yaml}")
+        raise FileNotFoundError(f'Map file not found: {map_yaml}')
 
     # Resolve config paths based on mode
     config_dir = os.path.join(pkg_dir, 'config', mode)
